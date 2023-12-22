@@ -2,7 +2,7 @@ import os
 from typing import List
 
 import dotenv
-import logging
+from logger import log
 
 from anthropic import HUMAN_PROMPT, AI_PROMPT, Anthropic
 from core.base_processor import ThreadQueueManager, BaseProcessor
@@ -12,10 +12,9 @@ from core.utils.general_utils import parse_response_strip_assistant_message
 from db.processor_state_db import BaseQuestionAnswerProcessorDatabaseStorage
 from tenacity import retry, wait_exponential, wait_random, retry_if_not_exception_type
 
-
 dotenv.load_dotenv()
 
-logging = logging.getLogger(__name__)
+logging = log.getLogger(__name__)
 anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", None)
 logging.info(f'**** ANTHROPIC API KEY (last 4 chars): {anthropic_api_key[-4:]} ****')
 
