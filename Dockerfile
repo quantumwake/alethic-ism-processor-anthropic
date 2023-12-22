@@ -55,9 +55,9 @@ RUN conda config --set channel_priority strict
 RUN conda install -y pulsar-client
 
 # seems to be an issue with only apple silicon?
-#RUN conda uninstall pydantic --force-remove
-#RUN conda install pydantic --no-deps
-#RUN conda install annotated-types
+RUN conda uninstall pydantic --force-remove
+RUN conda install pydantic --no-deps
+RUN conda install annotated-types
 
 # display all packages installed
 RUN conda list
