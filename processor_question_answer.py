@@ -33,7 +33,7 @@ class AnthropicQuestionAnswerProcessor(BaseQuestionAnswerProcessorDatabaseStorag
                          processor_state=processor_state,
                          processors=processors, **kwargs)
 
-        self.manager = ThreadQueueManager(num_workers=1, processor=self)
+        self.manager = ThreadQueueManager(num_workers=3, processor=self)
 
     @retry(retry=retry_if_not_exception_type(SyntaxError),
            wait=wait_exponential(multiplier=1, min=4, max=10) + wait_random(0, 2))
