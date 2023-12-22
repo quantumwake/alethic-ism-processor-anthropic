@@ -1,0 +1,9 @@
+.idea
+.idea/*
+*.gz
+logs/*.log
+.env
+*.swp
+__pycache__
+.DS_Store
+

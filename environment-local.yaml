@@ -1,0 +1,15 @@
+name: alethic-ism-processor-anthropic
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - python-dotenv
+  - psycopg2
+  - pyyaml
+  - pydantic
+  - anthropic 
+  - tenacity
+  - alethic-ism-core
+  - alethic-ism-db

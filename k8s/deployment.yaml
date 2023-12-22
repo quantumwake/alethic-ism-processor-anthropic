@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alethic-ism-processor-anthropic-deployment
+  namespace: alethic
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: alethic-ism-processor-anthropic
+  template:
+    metadata:
+      labels:
+        app: alethic-ism-processor-anthropic
+    spec:
+      containers:
+      - name: alethic-ism-processor-anthropic
+        image: <IMAGE>
+        envFrom:
+        - secretRef:
+            name: alethic-ism-processor-anthropic-secrets
+        imagePullPolicy: Always
+      imagePullSecrets:
+      - name: regcred
