@@ -58,6 +58,7 @@ RUN conda install -y pulsar-client
 # ** otherwise anthropic keeps downgrading pydantic to version ~= 1.0 from >=2.0
 RUN conda uninstall pydantic --force-remove
 RUN conda install pydantic --no-deps
+RUN conda install pydantic-core
 RUN conda install annotated-types
 
 # display all packages installed
