@@ -54,7 +54,8 @@ RUN conda config --set channel_priority strict
 ## Install Conda packages
 RUN conda install -y pulsar-client
 
-# seems to be an issue with only apple silicon?
+# ** this is required for anthropic and pydantic
+# ** otherwise anthropic keeps downgrading pydantic to version ~= 1.0 from >=2.0
 RUN conda uninstall pydantic --force-remove
 RUN conda install pydantic --no-deps
 RUN conda install annotated-types
