@@ -3,7 +3,8 @@
 This processor module is designed to respond to events from Pulsar and can be extended to other pub/sub systems like Kafka.
 
 ## Setup and Configuration
-- Add Conda channel: `conda config --add channels /Users/kasrarasaee/miniconda3/envs/local_channel`.
+If you are using miniconda, something along the lines of:
+- Add Conda channel: `conda config --add channels ~/miniconda3/envs/local_channel`.
 - Show Conda channels: `conda config --show channels`.
 
 ## Environment Initialization
