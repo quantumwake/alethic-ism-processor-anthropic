@@ -1,162 +1,99 @@
-# The Alethic Instruction-Based State Machine (ISM) is a versatile framework designed to 
-# efficiently process a broad spectrum of instructions. Initially conceived to prioritize
-# animal welfare, it employs language-based instructions in a graph of interconnected
-# processing and state transitions, to rigorously evaluate and benchmark AI models
-# apropos of their implications for animal well-being. 
-# 
-# This foundation in ethical evaluation sets the stage for the framework's broader applications,
-# including legal, medical, multi-dialogue conversational systems.
-# 
-# Copyright (C) 2023 Kasra Rasaee, Sankalpa Ghose, Yip Fai Tse (Alethic Research) 
-# 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-# 
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-# 
-# 
 import os
-import signal
-import sys
-
 import dotenv
-import pulsar
-import asyncio
-
-from core.processor_state import ProcessorStatus
-from core.processor_state_storage import ProcessorState
-from db.processor_state_db_storage import ProcessorStateDatabaseStorage
-from pydantic import ValidationError
+from core.base_message_consumer_lm import BaseMessagingConsumerLM
+from core.base_message_router import Router
+from core.base_model import ProcessorProvider, Processor, ProcessorState
+from core.processor_state import State
+from core.pulsar_message_producer_provider import PulsarMessagingProducerProvider
+from core.pulsar_messaging_provider import PulsarMessagingConsumerProvider
+from db.processor_state_db_storage import PostgresDatabaseStorage
 from processor_question_answer import AnthropicQuestionAnswerProcessor
-from logger import logging
 
 dotenv.load_dotenv()
-
-logging.info('starting up pulsar consumer for openai state processor.')
-
-# pulsar/kafka related
 MSG_URL = os.environ.get("MSG_URL", "pulsar://localhost:6650")
 MSG_TOPIC = os.environ.get("MSG_TOPIC", "ism_anthropic_qa")
-MSG_MANAGE_TOPIC = os.environ.get("MSG_MANAGE_TOPIC", "ism_anthropic_qa_manage")
+MSG_MANAGE_TOPIC = os.environ.get("MSG_MANAGE_TOPIC", "ism_anthropic_manage_topic")
 MSG_TOPIC_SUBSCRIPTION = os.environ.get("MSG_TOPIC_SUBSCRIPTION", "ism_anthropic_qa_subscription")
 
 # database related
-STATE_DATABASE_URL = os.environ.get("STATE_DATABASE_URL", "postgresql://postgres:postgres1@localhost:5432/postgres")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres1@localhost:5432/postgres")
 
-# flag that determines whether to shut down the consumers
-RUNNING = True
-
-# consumer config
-client = pulsar.Client(MSG_URL)
-processor_consumer = client.subscribe(MSG_TOPIC, MSG_TOPIC_SUBSCRIPTION)
-management_consumer = client.subscribe(MSG_MANAGE_TOPIC, MSG_TOPIC_SUBSCRIPTION)
-
-# state storage
-state_storage = ProcessorStateDatabaseStorage(database_url=STATE_DATABASE_URL,
-                                              incremental=True)
+# Message Routing File (
+#   Used for routing processed messages, e.g: input comes in,
+#   processed and output needs to be routed to the connected edges/processors
+# )
+ROUTING_FILE = os.environ.get("ROUTING_FILE", '.routing.yaml')
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 
 
-def close(consumer):
-    consumer.close()
+# state storage specifically to handle this processor state (stateless obj)
+storage = PostgresDatabaseStorage(
+    database_url=DATABASE_URL,
+    incremental=True
+)
+
+messaging_provider = PulsarMessagingConsumerProvider(
+    message_url=MSG_URL,
+    message_topic=MSG_TOPIC,
+    message_topic_subscription=MSG_TOPIC_SUBSCRIPTION,
+    management_topic=MSG_MANAGE_TOPIC
+)
+
+# pulsar messaging provider is used, the routes are defined in the routing.yaml
+pulsar_provider = PulsarMessagingProducerProvider()
+
+# routing the persistence of individual state entries to the state sync store topic
+router = Router(
+    provider=pulsar_provider,
+    yaml_file=ROUTING_FILE
+)
+
+# find the monitor route for telemetry updates
+monitor_route = router.find_router("processor/monitor")
+state_router_route = router.find_router("processor/monitor")
+sync_store_route = router.find_router('state/sync/store')
 
 
-async def execute(processor_state: ProcessorState):
-    input_state = state_storage.load_state(processor_state.input_state_id)
-    output_state = state_storage.load_state(processor_state.output_state_id)
-    processor_info = state_storage.fetch_processor(
-        processor_id=processor_state.processor_id
-    )
+class MessagingConsumerAnthropic(BaseMessagingConsumerLM):
+    # def create_processor(self, provider: ProcessorProvider, output_state: State):
+    def create_processor(self,
+                         processor: Processor,
+                         provider: ProcessorProvider,
+                         output_processor_state: ProcessorState,
+                         output_state: State):
 
-    # process the input state
-    processor = AnthropicQuestionAnswerProcessor(
-        state=output_state,
-        storage=state_storage,
-        processor_state=processor_state
-    )
+        processor = AnthropicQuestionAnswerProcessor(
+            # storage class information
+            state_machine_storage=storage,
 
-    try:
-        processor(input_state=input_state)
-    except Exception as exception:
-        processor_state.status = ProcessorStatus.FAILED
-        logging.error(f'critical error {exception}')
-    finally:
-        state_storage.update_processor_state(processor_state=processor_state)
+            # state processing information
+            output_state=output_state,
+            provider=provider,
+            processor=processor,
+            output_processor_state=output_processor_state,
 
+            # state information routing routers
+            monitor_route=self.monitor_route,
+            state_router_route=state_router_route,
+            sync_store_route=sync_store_route
+        )
 
-async def qa_topic_management_consumer():
-    while RUNNING:
-        try:
-            msg = management_consumer.receive()
-            data = msg.data().decode("utf-8")
-            logging.info(f'Message received with {data}')
+        return processor
 
-            # the configuration of the state
-            processor_state = ProcessorState.model_validate_json(data)
-            if processor_state.status in [ProcessorStatus.TERMINATED, ProcessorStatus.STOPPED]:
-                logging.info(f'terminating processor_state: {processor_state}')
-            else:
-                logging.info(f'nothing to do for processor_state: {processor_state}')
-        except Exception as e:
-            logging.error(e)
+    # async def execute(self, consumer_message_mapping: dict):
+    #     # submit completed execution
+    #     await self.post_execute(
+    #         consumer_message_mapping=consumer_message_mapping
+    #     )
 
-
-async def qa_topic_consumer():
-    while RUNNING:
-        try:
-            msg = processor_consumer.receive()
-            data = msg.data().decode("utf-8")
-            logging.info(f'Message received with {data}')
-
-            # the configuration of the state
-            processor_state = ProcessorState.model_validate_json(data)
-            processor_state = state_storage.fetch_processor_states_by(
-                processor_id=processor_state.processor_id,
-                input_state_id=processor_state.input_state_id,
-                output_state_id=processor_state.output_state_id
-            )
-            if processor_state.status in [ProcessorStatus.QUEUED, ProcessorStatus.RUNNING]:
-                await execute(processor_state=processor_state)
-            else:
-                logging.error(f'status not in QUEUED, unable to processor state: {processor_state}  ')
-
-            # send ack that the message was consumed.
-            processor_consumer.acknowledge(msg)
-
-            # Log success
-            # logger.info(
-            #     f"Message successfully consumed and stored with asset id {asset.id} for account {asset.library_id}")
-        except pulsar.Interrupted:
-            logging.error("Stop receiving messages")
-            break
-        except ValidationError as e:
-            # it is safe to assume that if we get a validation error, there is a problem with the json object
-            # TODO throw into an exception log or trace it such that we can see it on a dashboard
-            processor_consumer.acknowledge(msg)
-            logging.error(f"Message validation error: {e} on asset data {data}")
-        except Exception as e:
-            processor_consumer.acknowledge(msg)
-            # TODO need to send this to a dashboard, all excdptions in consumers need to be sent to a dashboard
-            logging.error(f"An error occurred: {e} on asset data {data}")
-
-
-def graceful_shutdown(signum, frame):
-    global RUNNING
-    print("Received SIGTERM signal. Gracefully shutting down.")
-    RUNNING = False
-
-    sys.exit(0)
-
-
-# Attach the SIGTERM signal handler
-signal.signal(signal.SIGTERM, graceful_shutdown)
 
 if __name__ == '__main__':
-    asyncio.run(qa_topic_consumer())
+    consumer = MessagingConsumerAnthropic(
+        name="MessagingConsumerAnthropic",
+        storage=storage,
+        messaging_provider=messaging_provider,
+        monitor_route=monitor_route
+    )
+
+    consumer.setup_shutdown_signal()
+    consumer.start_topic_consumer()
