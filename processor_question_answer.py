@@ -39,13 +39,3 @@ class AnthropicQuestionAnswerProcessor(BaseProcessorLM):
         # raw_response = completion.completion
         return parse_response_strip_assistant_message(raw_response=raw_response)
 
-    def apply_states(self, query_states: [dict]):
-        route_message = {
-            "route_id": self.output_processor_state.id,
-            "type": "query_state_list",
-            "query_state_list": query_states
-        }
-
-        self.sync_store_route.send_message(json.dumps(route_message))
-        return query_states
-

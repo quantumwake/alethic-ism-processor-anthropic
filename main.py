@@ -1,21 +1,17 @@
+import asyncio
 import os
 import dotenv
-from core.base_message_consumer_lm import BaseMessagingConsumerLM
-from core.base_message_router import Router
 from core.base_model import ProcessorProvider, Processor, ProcessorState
 from core.base_processor import StatePropagationProviderRouterStateSyncStore, StatePropagationProviderDistributor, \
     StatePropagationProviderRouterStateRouter
+from core.messaging.base_message_consumer_processor import BaseMessageConsumerProcessor
+from core.messaging.base_message_router import Router
+from core.messaging.nats_message_provider import NATSMessageProvider
 from core.processor_state import State
-from core.pulsar_message_producer_provider import PulsarMessagingProducerProvider
-from core.pulsar_messaging_provider import PulsarMessagingConsumerProvider
 from db.processor_state_db_storage import PostgresDatabaseStorage
 from processor_question_answer import AnthropicQuestionAnswerProcessor
 
 dotenv.load_dotenv()
-MSG_URL = os.environ.get("MSG_URL", "pulsar://localhost:6650")
-MSG_TOPIC = os.environ.get("MSG_TOPIC", "ism_anthropic_qa")
-MSG_MANAGE_TOPIC = os.environ.get("MSG_MANAGE_TOPIC", "ism_anthropic_manage_topic")
-MSG_TOPIC_SUBSCRIPTION = os.environ.get("MSG_TOPIC_SUBSCRIPTION", "ism_anthropic_qa_subscription")
 
 # database related
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres1@localhost:5432/postgres")
@@ -34,35 +30,29 @@ storage = PostgresDatabaseStorage(
     incremental=True
 )
 
-messaging_provider = PulsarMessagingConsumerProvider(
-    message_url=MSG_URL,
-    message_topic=MSG_TOPIC,
-    message_topic_subscription=MSG_TOPIC_SUBSCRIPTION,
-    management_topic=MSG_MANAGE_TOPIC
-)
-
-# pulsar messaging provider is used, the routes are defined in the routing.yaml
-pulsar_provider = PulsarMessagingProducerProvider()
+message_provider = NATSMessageProvider()
 
 # routing the persistence of individual state entries to the state sync store topic
 router = Router(
-    provider=pulsar_provider,
+    provider=message_provider,
     yaml_file=ROUTING_FILE
 )
 
 # find the monitor route for telemetry updates
-monitor_route = router.find_router("processor/monitor")
-state_router_route = router.find_router("processor/monitor")
-sync_store_route = router.find_router('state/sync/store')
+monitor_route = router.find_route("processor/monitor")
+state_router_route = router.find_route("processor/state/router")
+state_sync_route = router.find_route('processor/state/sync')
+anthropic_route_subscriber = router.find_route_by_subject("processor.models.anthropic")
 
 state_propagation_provider = StatePropagationProviderDistributor(
     propagators=[
-        StatePropagationProviderRouterStateSyncStore(route=router.find_router('state/sync/store')),
-        StatePropagationProviderRouterStateRouter(route=router.find_router('state/router'))
+        StatePropagationProviderRouterStateSyncStore(route=state_sync_route),
+        StatePropagationProviderRouterStateRouter(route=state_router_route)
     ]
 )
 
-class MessagingConsumerAnthropic(BaseMessagingConsumerLM):
+
+class MessagingConsumerAnthropic(BaseMessageConsumerProcessor):
     # def create_processor(self, provider: ProcessorProvider, output_state: State):
     def create_processor(self,
                          processor: Processor,
@@ -96,11 +86,10 @@ class MessagingConsumerAnthropic(BaseMessagingConsumerLM):
 
 if __name__ == '__main__':
     consumer = MessagingConsumerAnthropic(
-        name="MessagingConsumerAnthropic",
         storage=storage,
-        messaging_provider=messaging_provider,
+        route=anthropic_route_subscriber,
         monitor_route=monitor_route
     )
 
     consumer.setup_shutdown_signal()
-    consumer.start_topic_consumer()
+    asyncio.get_event_loop().run_until_complete(consumer.start_consumer())

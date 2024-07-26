@@ -6,4 +6,5 @@ logs/*.log
 *.swp
 __pycache__
 .DS_Store
+k8s/deployment-output.yaml
 
