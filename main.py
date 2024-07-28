@@ -1,5 +1,7 @@
 import asyncio
 import os
+import random
+
 import dotenv
 from core.base_model import ProcessorProvider, Processor, ProcessorState
 from core.base_processor import StatePropagationProviderRouterStateSyncStore, StatePropagationProviderDistributor, \
@@ -91,5 +93,10 @@ if __name__ == '__main__':
         monitor_route=monitor_route
     )
 
+    # TODO think this through - important for workload creation. Here we randomly select a consumer number,
+    #  and hope it does not collide with another consumer; if it does, then the consumer will throw an error
+    #  and should exit, whereby next choosing a different number. Eventually, the consumer will find a spot.
+    consumer_no = random.randint(0, 20)     # this should be a workload identity subscription
+
     consumer.setup_shutdown_signal()
-    asyncio.get_event_loop().run_until_complete(consumer.start_consumer())
+    asyncio.get_event_loop().run_until_complete(consumer.start_consumer(consumer_no=consumer_no))
