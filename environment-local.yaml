@@ -9,7 +9,8 @@ dependencies:
   - psycopg2
   - pyyaml
   - pydantic
-  - anthropic 
+  - redis
+  - anthropic
   - tenacity
   - alethic-ism-core
   - alethic-ism-db

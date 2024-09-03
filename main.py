@@ -11,7 +11,8 @@ from core.messaging.base_message_router import Router
 from core.messaging.nats_message_provider import NATSMessageProvider
 from core.processor_state import State
 from db.processor_state_db_storage import PostgresDatabaseStorage
-from processor_question_answer import AnthropicQuestionAnswerProcessor
+
+from anthropic_lm import AnthropicQuestionAnswerProcessor
 
 dotenv.load_dotenv()
 
@@ -45,11 +46,13 @@ monitor_route = router.find_route("processor/monitor")
 state_router_route = router.find_route("processor/state/router")
 state_sync_route = router.find_route('processor/state/sync')
 anthropic_route_subscriber = router.find_route_by_subject("processor.models.anthropic")
+state_stream_route = router.find_route("processor/state")
+usage_route = router.find_route("processor/usage")
 
 state_propagation_provider = StatePropagationProviderDistributor(
     propagators=[
         StatePropagationProviderRouterStateSyncStore(route=state_sync_route),
-        StatePropagationProviderRouterStateRouter(route=state_router_route)
+        StatePropagationProviderRouterStateRouter(route=state_router_route, storage=storage)
     ]
 )
 
@@ -71,6 +74,10 @@ class MessagingConsumerAnthropic(BaseMessageConsumerProcessor):
             provider=provider,
             processor=processor,
             output_processor_state=output_processor_state,
+
+            # stream outputs
+            stream_route=state_stream_route,
+            usage_route=usage_route,
 
             # state information routing routers
             monitor_route=self.monitor_route,
