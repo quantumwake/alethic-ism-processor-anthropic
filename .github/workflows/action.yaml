@@ -1,4 +1,4 @@
-name: Docker Image CI for Alethic OpenAI Processor (Python)
+name: Docker Image CI for Alethic Anthropic Processor (Python)
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
       run: |
         COMMIT_ID=$(echo $GITHUB_SHA | head -c7)
         NAMESPACE="krasaee"
-        PROJECT_NAME="alethic-ism-processor-openai"
+        PROJECT_NAME="alethic-ism-processor-anthropic"
         IMAGE="$NAMESPACE/$PROJECT_NAME:$COMMIT_ID"
         
         echo "COMMIT_ID=$COMMIT_ID" >> "$GITHUB_ENV" # for local variables
@@ -67,4 +67,4 @@ jobs:
         bash docker_deploy.sh -i $IMAGE
 
     - name: Verify deployment
-      run: kubectl rollout status deployment/alethic-ism-processor-openai-deployment -n alethic
+      run: kubectl rollout status deployment/alethic-ism-processor-anthropic-deployment -n alethic
