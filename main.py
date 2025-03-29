@@ -3,15 +3,17 @@ import os
 import random
 
 import dotenv
-from core.base_model import ProcessorProvider, Processor, ProcessorState
-from core.base_processor import StatePropagationProviderRouterStateSyncStore, StatePropagationProviderDistributor, \
-    StatePropagationProviderRouterStateRouter
-from core.messaging.base_message_consumer_processor import BaseMessageConsumerProcessor
-from core.messaging.base_message_router import Router
-from core.messaging.nats_message_provider import NATSMessageProvider
-from core.processor_state import State
-from db.processor_state_db_storage import PostgresDatabaseStorage
+from ismcore.messaging.base_message_consumer_processor import BaseMessageConsumerProcessor
+from ismcore.messaging.base_message_router import Router
+from ismcore.messaging.nats_message_provider import NATSMessageProvider
+from ismcore.model.base_model import Processor, ProcessorProvider, ProcessorState
+from ismcore.model.processor_state import State
+from ismcore.processor.base_processor import (
+    StatePropagationProviderDistributor,
+    StatePropagationProviderRouterStateSyncStore,
+    StatePropagationProviderRouterStateRouter)
 
+from ismdb.postgres_storage_class import PostgresDatabaseStorage
 from anthropic_lm import AnthropicQuestionAnswerProcessor
 
 dotenv.load_dotenv()
