@@ -1,49 +1,40 @@
 # Alethic Instruction-Based State Machine (Anthropic Processor)
 
-## Overview
-A processor module for the Alethic ISM that handles Anthropic AI model interactions. 
-
-This processor:
-- Accepts input states and their associated instructions and state configutation.
-- Processes inputs through Anthropic's AI models, returning results and future processing instructions.
-- Outputs states containing derived results and forwards them back onto the ISM network.
-- Ensures type compatibility with connected processors.
-
-## Build Docker Image
-
-```bash
-make docker
+### Docker Build
+```shell
+  sh docker_build.sh -t krasaee/alethic-ism-processor-anthropic:local`
 ```
 
-## Environment Initialization
-- Create environment: `conda env create -f environment.yaml`.
-- Activate environment: `conda activate alethic-ism-processor-anthropic`.
+### Required Packages
+```shell
+  pip install uv
+```
 
-## Troubleshooting
-For pydantic and anthropic version issues on Apple Silicon (M3 Max):
-- Force remove pydantic: `conda uninstall pydantic --force-remove`.
-- Reinstall pydantic without dependencies: `conda install pydantic --no-deps`.
-- Install annotated-types: `conda install annotated-types`.
+```shell
+  pip venv
+  source .venv/bin/activate
+```
 
-## Alethic Dependencies
-- `conda install quantumwake::alethic-ism-core`
-- `conda install quantumwake::alethic-ism-db`
+```shell
+  uv pip install -r requirements.txt
+```
 
-- Local: Install from the local channel if remote versions aren't available.
-
-## Testing
-- ** testing is not exactly working right now **
-- Install pytest: `conda install pytest`.
-
-## Contribution
-Contributions, questions, and feedback are highly encouraged. Contact us for any queries or suggestions.
-
+## Run
+```shell
+docker run -d \
+  --name alethic-ism-processor-anthropic \
+  -e ANTHROPIC_API_KEY="your_api_key_here" \
+  -e LOG_LEVEL=DEBUG \
+  -e ROUTING_FILE=/app/routing-nats.yaml \
+  -e STATE_DATABASE_URL="postgresql://postgres:postgres1@host.docker.internal:5432/postgres" \
+  krasaee/alethic-ism-processor-anthropic:latest
+```
 ## License
-Released under GNU3 license.
+Alethic ISM is under a DUAL licensing model, please refer to [LICENSE.md](LICENSE.md).
 
-## Acknowledgements
-Special thanks to Alethic Research, Princeton University Center for Human Values, and New York University.
+**AGPL v3**  
+Intended for academic, research, and nonprofit institutional use. As long as all derivative works are also open-sourced under the same license, you are free to use, modify, and distribute the software.
 
----
+**Commercial License**
+Intended for commercial use, including production deployments and proprietary applications. This license allows for closed-source derivative works and commercial distribution. Please contact us for more information.
 
-For more updates and involvement opportunities, visit the [Alethic ISM GitHub page](https://github.com/quantumwake/alethic) or create an issue/comment ticket.
