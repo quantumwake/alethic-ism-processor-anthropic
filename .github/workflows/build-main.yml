@@ -19,7 +19,7 @@ jobs:
         uses: quantumwake/alethic-ism-github-actions@main
         with:
           # Required inputs
-          image-name: 'krasaee/alethic-processor-anthropic'
+          image-name: 'krasaee/alethic-ism-processor-anthropic'
           registry-username: ${{ vars.DOCKERHUB_USERNAME }}
           registry-token: ${{ secrets.DOCKERHUB_TOKEN }}
           registry: 'docker.io'
