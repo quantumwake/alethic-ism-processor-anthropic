@@ -163,7 +163,7 @@ class AnthropicQuestionAnswerProcessor(BaseProcessorLM, MonitoredUsage):
 
             # logging.debug(f"\n\nRoute {self.processor.id}:", stream.get_final_message().usage)
 
-    async def _execute(self, user_prompt: str, system_prompt: str, values: dict):
+    async def _execute(self, user_prompt: str, system_prompt: str, values: dict | List[dict]):
         message = self.anthropic.messages.create(
             model=self.provider.version,
             max_tokens=1024,
